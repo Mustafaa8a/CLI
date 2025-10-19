@@ -22,6 +22,10 @@ public class Parser {
         // Make an array to store the whole command 
         String[] commands = command.split(" ");
         commandName=commands[0];
+        
+        // We didn't specify size of the array so we will specify it now with number of commands-1 
+        args = new String[commands.length-1];
+        
         for (int i = 1; i < commands.length; i++) {
             args[i-1]=commands[i];
         }
@@ -109,6 +113,7 @@ public String ls()
             if (cmd.equals("exit")) {
                 break;
             }
+            // run command
             System.out.println(terminal.runCommand(cmd,arg));
             
         }
