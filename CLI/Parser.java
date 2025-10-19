@@ -4,7 +4,8 @@ import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
 import java.util.zip.*;
-
+import java.util.stream.Collectors;
+import java.io.IOException;
 
 public class Parser {
     String commandName;
@@ -48,17 +49,45 @@ class Terminal {
         return currentPath.toAbsolutePath().toString();
     }
 
+public String ls()
+{
+    if (!Files.exists(currentPath))
+    {
+        System.out.println("Error:directory does not exist");
+        return "";
+    }
 
-    
+    if (!Files.isDirectory(currentPath))
+    {
+        System.out.println("Error:path is not a directory");
+        return "";
+    }
+
+    try (var paths = Files.list(currentPath))
+    {
+        return paths.map(p -> p.getFileName().toString()).sorted().collect(Collectors.joining("\n"));
+    } 
+    catch (IOException error)
+    {
+        System.out.println("Error reading directory: " + error.getMessage());
+        return "";
+    }
+}
+
     private String runCommand(String cmd,String[] args){
         switch (cmd) {
             case "pwd":
                 return pwd();
         
+            case("ls"):
+                return ls();
+
             default:
                 System.out.print("Command Not Found");
                 return "";
         }
+        
+
     }
 
 
