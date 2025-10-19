@@ -56,7 +56,7 @@ class Terminal {
                 return pwd();
         
             default:
-                System.out.println("Command Not Found");
+                System.out.print("Command Not Found");
                 return "";
         }
     }
@@ -80,7 +80,7 @@ class Terminal {
             if (cmd.equals("exit")) {
                 break;
             }
-            terminal.runCommand(cmd,arg);
+            System.out.println(terminal.runCommand(cmd,arg));
             
         }
         
