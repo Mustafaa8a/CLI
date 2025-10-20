@@ -1,11 +1,8 @@
 package CLI;
-import java.io.*;
-import java.nio.file.*;
-import java.nio.file.attribute.BasicFileAttributes;
-import java.util.*;
-import java.util.zip.*;
-import java.util.stream.Collectors;
 import java.io.IOException;
+import java.nio.file.*;
+import java.util.*;
+import java.util.stream.Collectors;
 
 public class Parser {
     String commandName;
@@ -206,6 +203,46 @@ class Terminal {
             System.out.print(file.getFileName() + " does not exist or is not a file");
         }
     }
+   
+    //===========================================
+    //  mkdir command implementation
+    //===========================================
+    public void mkdir(String[] args) throws IOException {
+   
+        // Check if user passed at least one argument   
+        if (args.length == 0) {
+        System.out.println("mkdir: missing operand");
+        return;
+    }
+
+    // handle folders with spaces
+    // If the folder name contains spaces, args[] will hold each word separately
+    // We need to join them back into a SINGLE string
+    String DirName = String.join(" ", args);
+    
+    // Build the absolute path of the directory the user wants to create
+    // resolve(...) attaches the new folder name to the currentPath
+    // normalize() cleans up any "../" or "./"
+    Path DirPath = currentPath.resolve(DirName).normalize().toAbsolutePath();
+    
+    
+    // Check if directory already exists to avoid crash or overwriting
+    if (Files.exists(DirPath)) {
+        System.out.println("mkdir: cannot create directory  '" + DirName + "': File exists ");
+        return;
+    }
+
+    // Try to create directory safely
+    try {
+        
+        Files.createDirectory(DirPath);
+    } catch (IOException e) {
+        
+        // IOException happens if you don't have permission or invalid path
+        System.out.println("mkdir: failed to create directory '" + DirName + "': " + e.getMessage());
+    }
+}
+
 
     private String runCommand(String cmd,String[] args) throws IOException{
         switch (cmd) {
@@ -226,6 +263,11 @@ class Terminal {
             case("rm"):
                 rm(args);
                 return ""; 
+
+                
+            case("mkdir"):
+               mkdir(args);
+               return "";
 
 
             default:
