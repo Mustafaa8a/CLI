@@ -207,39 +207,32 @@ class Terminal {
     //===========================================
     //  mkdir command implementation
     //===========================================
-    public void mkdir(String[] args) throws IOException {
-   
-        // Check if user passed at least one argument   
-        if (args.length == 0) {
+   public void mkdir(String[] args) {
+    // 1) Check if user passed at least one argument 
+    if (args.length == 0) {
         System.out.println("mkdir: missing operand");
         return;
     }
 
-    // handle folders with spaces
-    // If the folder name contains spaces, args[] will hold each word separately
-    // We need to join them back into a SINGLE string
-    String DirName = String.join(" ", args);
-    
-    // Build the absolute path of the directory the user wants to create
-    // resolve(...) attaches the new folder name to the currentPath
-    // normalize() cleans up any "../" or "./"
-    Path DirPath = currentPath.resolve(DirName).normalize().toAbsolutePath();
-    
-    
-    // Check if directory already exists to avoid crash or overwriting
-    if (Files.exists(DirPath)) {
-        System.out.println("mkdir: cannot create directory  '" + DirName + "': File exists ");
-        return;
-    }
+    // 2) Loop over each argument (each dir name/path separately)
+    for (String dirArg : args) {
+        
+        // Build the path for this directory
+        Path dirPath = currentPath.resolve(dirArg).normalize().toAbsolutePath();
+        
+        // Check if directory exists
+        if (Files.exists(dirPath)) {
+            System.out.println("mkdir: cannot create directory '" + dirArg + "': File exists");
+            continue; // move to next one
+        }
 
-    // Try to create directory safely
-    try {
-        
-        Files.createDirectory(DirPath);
-    } catch (IOException e) {
-        
-        // IOException happens if you don't have permission or invalid path
-        System.out.println("mkdir: failed to create directory '" + DirName + "': " + e.getMessage());
+        // Try to create directory (including parent folders)
+        try {
+            // createDirectories → supports nested like xxx/xxxx
+            Files.createDirectories(dirPath);
+        } catch (IOException e) {
+            System.out.println("mkdir: failed to create '" + dirArg + "': " + e.getMessage());
+        }
     }
 }
 
