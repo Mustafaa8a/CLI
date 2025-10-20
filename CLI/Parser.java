@@ -187,6 +187,25 @@ class Terminal {
         }
 
     } 
+    public void rm(String[] args) throws IOException{
+        // if the folder name has spaces
+        String arg="";
+        for (String string : args) {
+            arg+=string+" ";
+        }
+        arg=arg.trim(); // To remove the last space
+
+        // Path of the file 
+        Path file = currentPath.resolve(arg);
+
+        // Check if the file exists and is a file
+        if (Files.isRegularFile(file)) {
+            Files.delete(file);
+        }
+        else{
+            System.out.print(file.getFileName() + " does not exist or is not a file");
+        }
+    }
 
     private String runCommand(String cmd,String[] args) throws IOException{
         switch (cmd) {
@@ -202,6 +221,10 @@ class Terminal {
             
             case("rmdir"):
                 rmdir(args);
+                return ""; 
+           
+            case("rm"):
+                rm(args);
                 return ""; 
 
 
