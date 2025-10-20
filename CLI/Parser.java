@@ -53,38 +53,157 @@ class Terminal {
         return currentPath.toAbsolutePath().toString();
     }
 
-public String ls()
-{
-    if (!Files.exists(currentPath))
-    {
-        System.out.println("Error:directory does not exist");
-        return "";
+    public void cd(String[] args) {
+        if (args.length == 1 || args.length == 0) {
+
+            Path newPath;
+            // if No arguments: go to home directory
+            if (args.length == 0) {
+                newPath = homePath;
+            } 
+            else {
+                String arg = args[0];
+                // Go to parent directory
+                if ("..".equals(arg)) {
+                    Path parentPath = currentPath.getParent();
+                    if (parentPath == null) {
+                        return;
+                    }else{
+                        currentPath = parentPath;
+                        return;
+                    }
+                }
+
+                // Navigate to a specific directory
+                newPath = currentPath.resolve(arg);
+                newPath = newPath.normalize().toAbsolutePath();
+
+                if (Files.isDirectory(newPath)) {
+                    currentPath = newPath;
+                    return;
+                } else {
+                    System.out.println("Error: Directory does not exist");
+                    return;
+                }
+            }
+
+            // Apply home path change if no args
+            currentPath = newPath;
+
+        } 
+        else {
+         System.out.println("Error: too many arguments");
+            return;
+        }
     }
 
-    if (!Files.isDirectory(currentPath))
-    {
-        System.out.println("Error:path is not a directory");
-        return "";
+    public String ls(){
+        if (!Files.exists(currentPath))
+        {
+            System.out.println("Error:directory does not exist");
+            return "";
+        }
+
+        if (!Files.isDirectory(currentPath))
+        {
+            System.out.println("Error:path is not a directory");
+            return "";
+        }
+
+        try (var paths = Files.list(currentPath))
+        {
+            return paths.map(p -> p.getFileName().toString()).sorted().collect(Collectors.joining("\n"));
+        } 
+        catch (IOException error)
+        {
+            System.out.println("Error reading directory: " + error.getMessage());
+            return "";
+        }
     }
 
-    try (var paths = Files.list(currentPath))
-    {
-        return paths.map(p -> p.getFileName().toString()).sorted().collect(Collectors.joining("\n"));
+    public void rmdir(String[] args) throws IOException {
+        /*
+         1- * => removes all empty directories
+         2- path => remove the given directory is it's empty
+         3-  handle spaces in the name of the directory
+        */
+        if (args.length==0) {
+            System.out.println("Error: rmdir takes one argument");
+            return;
+        }
+
+        if ("*".equals(args[0])){
+            // We need to loop over all the directories in the current path and check if they are ampty if so remove
+
+            // Get all direcrotries in the current path
+            try (DirectoryStream<Path> dirStream = Files.newDirectoryStream(currentPath, Files::isDirectory)) {
+            
+                for (Path dir : dirStream) {
+
+                    // We will go into each directory to see if it's empty or not 
+                    try (DirectoryStream<Path> dir2 = Files.newDirectoryStream(dir)) {
+
+                        if (!dir2.iterator().hasNext()) { 
+                            Files.delete(dir);
+                            
+                        }
+                    }
+                }   
+            }
+            return;
+        }
+        else{
+            // if the folder name has spaces
+            String arg="";
+            for (String string : args) {
+                arg+=string+" ";
+            }
+            arg=arg.trim(); // To remove the last space
+
+            // Get the path of the directory we want to delete
+            Path dir = currentPath.resolve(arg).normalize().toAbsolutePath();
+
+            // Check if the dir exists and is a directory not a file
+            if (Files.isDirectory(dir)) {
+
+                // check if the directory is empty
+                try (DirectoryStream<Path> dir2 = Files.newDirectoryStream(dir)) {
+
+                    if (!dir2.iterator().hasNext()) { 
+                        Files.delete(dir);
+                        return;
+                    }
+                    else {
+                        System.out.print(dir.getFileName()+" is not empty!");
+                    }
+                }
+                return;
+            } 
+            else {
+                System.out.print("Error: Directory does not exist");
+                return;
+            }
+            
+        }
+
     } 
-    catch (IOException error)
-    {
-        System.out.println("Error reading directory: " + error.getMessage());
-        return "";
-    }
-}
 
-    private String runCommand(String cmd,String[] args){
+    private String runCommand(String cmd,String[] args) throws IOException{
         switch (cmd) {
             case "pwd":
                 return pwd();
         
             case("ls"):
                 return ls();
+                
+            case("cd"):
+                cd(args);
+                return ""; 
+            
+            case("rmdir"):
+                rmdir(args);
+                return ""; 
+
 
             default:
                 System.out.print("Command Not Found");
@@ -95,7 +214,7 @@ public String ls()
     }
 
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws IOException {
         Terminal terminal = new Terminal();
         Scanner scanner = new Scanner(System.in);
         
