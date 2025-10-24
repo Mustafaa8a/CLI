@@ -603,7 +603,7 @@ private void copyFile(Path source, Path destination) throws IOException
             case("rmdir"):
                 rmdir(args);
                 return ""; 
-                 
+            
             case("rm"):
                 rm(args);
                 return ""; 
