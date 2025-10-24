@@ -251,7 +251,8 @@ private void copyDirectoryRecursively(Path source, Path destination) throws IOEx
 }
 
 
-private void copyFile(Path source, Path destination) throws IOException {
+private void copyFile(Path source, Path destination) throws IOException
+{
     // If the parent directory of destination does not exist, create it
     Path parent = destination.getParent();
     if (parent != null && !Files.exists(parent)) {
@@ -271,8 +272,8 @@ private void copyFile(Path source, Path destination) throws IOException {
 
     public void rmdir(String[] args) {
         /*
-         1- * => removes all empty directories
-         2- path => remove the given directory is it's empty
+         removes all empty directories
+         path => remove the given directory is it's empty
         */
         if (args.length==0) {
             System.out.println("Error: rmdir takes one argument");
@@ -444,6 +445,63 @@ private void copyFile(Path source, Path destination) throws IOException {
         }
     }
 
+    public void unzip(String[] args)
+    {
+      if(args.length!=1 && !(args[1].equals("-d") && args.length==3))
+      {
+        System.out.println("Error: Invalid number of arguments");
+        return;
+      }
+      Path zipFilePath = currentPath.resolve(args[0]).normalize();
+     //Destination directory: if "-d" provided use its value, otherwise use currentPath
+      Path destinationDir = (args.length == 3) ? resolvePath(args[2]) : currentPath;
+      
+      //Ensure the zip file exists before attempting to open it
+      if(!Files.exists(zipFilePath))
+      {
+        System.out.println("Error: Zip file not found");
+        return;
+      }
+
+      //Create destination directory using your existing mkdir() if the desired directory does not exist
+    try 
+    {
+     if (!Files.exists(destinationDir))
+     {
+        Files.createDirectories(destinationDir); 
+     } 
+    } 
+    catch (IOException e) 
+    { 
+        System.out.println("Error: Cannot create destination directory"); return;
+   }
+    //Open the zip file as a stream and iterate over entries
+        try (ZipInputStream zis = new ZipInputStream(Files.newInputStream(zipFilePath))) 
+        {
+            ZipEntry entry;
+            while ((entry = zis.getNextEntry()) != null) 
+            {
+            Path newFilePath = destinationDir.resolve(entry.getName()).normalize();
+            if (entry.isDirectory()) 
+            {
+                Files.createDirectories(newFilePath);
+            } 
+            else 
+            {
+                //For files ensure parent directory exists
+                Files.createDirectories(newFilePath.getParent());
+                //Copy entry data from the zip input stream to the output file
+                Files.copy(zis, newFilePath, StandardCopyOption.REPLACE_EXISTING);
+            }
+            zis.closeEntry();
+            }
+        } 
+        catch (IOException error) 
+        {
+            System.out.println("Error extracting zip file: " + error.getMessage());
+        }
+    }
+
     public void rm(String[] args){
 
         // Path of the file 
@@ -514,10 +572,20 @@ private void copyFile(Path source, Path destination) throws IOException {
             System.out.println(numLines + " " + numWords + " " + charCount + " " + file.getFileName());
             
         } catch (Exception e) {
-             System.out.println("Error: Can not resolve file" + e.getMessage());
+            System.out.println("Error: Can not resolve file " + e.getMessage());
         }
         
     }
+
+    private Path resolvePath(String pathStr) {
+    Path path = Paths.get(pathStr);
+    if (!path.isAbsolute()) {
+        path = currentPath.resolve(path).normalize().toAbsolutePath();
+    } else {
+        path = path.normalize().toAbsolutePath();
+    }
+    return path;
+}
 
     private String runCommand(String cmd,String[] args){
         
@@ -562,7 +630,11 @@ private void copyFile(Path source, Path destination) throws IOException {
 
             case "zip":
                 zip(args);
-                return "";   
+                return "";  
+
+            case "unzip":
+                unzip(args);
+                return ""; 
 
             default:
                 System.out.print("Command Not Found");
