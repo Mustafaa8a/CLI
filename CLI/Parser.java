@@ -3,6 +3,10 @@ import java.io.IOException;
 import java.nio.file.*;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.util.zip.*;
+import java.io.FileOutputStream;
+
 
 public class Parser {
     String commandName;
@@ -94,13 +98,16 @@ class Terminal {
         }
     }
 
-    public String ls(){
+    public String ls()
+    {
+        // Check if the current directory path exists
         if (!Files.exists(currentPath))
         {
             System.out.println("Error:directory does not exist");
             return "";
         }
 
+        // Ensure that the current path is actually a directory
         if (!Files.isDirectory(currentPath))
         {
             System.out.println("Error:path is not a directory");
@@ -109,6 +116,7 @@ class Terminal {
 
         try (var paths = Files.list(currentPath))
         {
+            // Convert each Path to its file name, sort them alphabetically, and join them into one string with new lines
             return paths.map(p -> p.getFileName().toString()).sorted().collect(Collectors.joining("\n"));
         } 
         catch (IOException error)
@@ -117,6 +125,114 @@ class Terminal {
             return "";
         }
     }
+
+public void cp(String[] args) 
+{
+    // Check if user passed at least 2 arguments (source and destination)
+    if (args.length < 2) 
+    {
+        System.out.println("Error: cp requires exactly two arguments");
+        return;
+    }
+
+    boolean recursive = false;
+    int startIndex = 0;
+
+    // Check if the first argument is "-r" (recursive copy)
+    if (args[0].equals("-r")) 
+    {
+        recursive = true;
+        startIndex = 1;
+
+        // After "-r", there must be exactly 2 arguments (source and destination)
+        if (args.length - startIndex != 2) 
+        {
+            System.out.println("Error: cp -r requires exactly two arguments");
+            return;
+        }
+    } 
+    else if (args.length != 2) 
+    {
+        System.out.println("Error: cp requires exactly two arguments");
+        return;
+    }
+
+    // Resolve source and destination paths relative to currentPath
+    Path source = currentPath.resolve(args[startIndex]).normalize().toAbsolutePath();
+    Path destination = currentPath.resolve(args[startIndex + 1]).normalize().toAbsolutePath();
+
+    // Check if source exists
+    if (!Files.exists(source)) 
+    {
+        System.out.println("Error: Source not found");
+        return;
+    }
+
+    // Perform copy operation
+    try {
+        if (recursive) {
+            copyDirectoryRecursively(source, destination);
+        } else {
+            copyFile(source, destination);
+        }
+    } catch (IOException error) {
+        System.out.println("Error: " + error.getMessage());
+    }
+}
+
+
+private void copyDirectoryRecursively(Path source, Path destination) throws IOException 
+{
+    // If destination directory does not exist, create it
+    if (!Files.exists(destination)) 
+    {
+        Files.createDirectories(destination);
+    }
+
+    // Walk through all files and subdirectories inside the source folder
+    Files.walkFileTree(source, new SimpleFileVisitor<Path>() 
+    {
+
+        // Called before visiting each subdirectory
+        @Override
+        public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException 
+        {
+            // Create the corresponding directory in the destination
+            Path targetDir = destination.resolve(source.relativize(dir));
+            Files.createDirectories(targetDir);
+            return FileVisitResult.CONTINUE;
+        }
+
+        // Called for each file found in the source folder
+        @Override
+        public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException 
+        {
+            // Copy each file to the destination, keeping the relative structure
+            Path targetFile = destination.resolve(source.relativize(file));
+            Files.copy(file, targetFile, StandardCopyOption.REPLACE_EXISTING);
+            return FileVisitResult.CONTINUE;
+        }
+    });
+}
+
+
+private void copyFile(Path source, Path destination) throws IOException {
+    // If the parent directory of destination does not exist, create it
+    Path parent = destination.getParent();
+    if (parent != null && !Files.exists(parent)) {
+        Files.createDirectories(parent);
+    }
+
+    // Check if the source is a file (not a directory)
+    if (Files.isDirectory(source)) {
+        System.out.println("Error: For cp, both must be files");
+        return;
+    }
+
+    // Copy the file, replacing if it already exists
+    Files.copy(source, destination, StandardCopyOption.REPLACE_EXISTING);
+}
+
 
     public void rmdir(String[] args) throws IOException {
         /*
@@ -184,6 +300,118 @@ class Terminal {
         }
 
     } 
+
+    public void touch(String[] args) {
+        if (args.length == 1) {
+            Path newFile = Paths.get(args[0]);
+            if (!newFile.isAbsolute()) {
+                // Get the given path
+                newFile = currentPath.resolve(newFile).normalize();
+            }
+            try {
+                // Create the file
+                Files.createFile(newFile);
+            } catch (IOException e) {
+                System.out.println("Error creating file: " + e.getMessage());
+            }
+        } else {
+            System.out.println("Error: invalid number of arguments");
+            return;
+        }
+    }
+
+    public void cat(String[] args) {
+        if (args.length == 1 || args.length == 2) {
+            for (String arg : args) {
+                Path filePath = Paths.get(arg);
+                if (!filePath.isAbsolute()) {
+                    filePath = currentPath.resolve(filePath).normalize();
+                }
+                try {
+                    List<String> lines = Files.readAllLines(filePath);
+                    for (String line : lines) {
+                        System.out.println(line);
+                    }
+                } catch (IOException e) {
+                    System.out.println("Error reading file: " + e.getMessage());
+                }
+                if (!Files.exists(filePath)) {
+                System.out.println("Error: file does not exist: " + filePath);
+                continue;
+                }
+            }
+
+        } else {
+            System.out.println("Error: invalid number of arguments");
+            return;
+        }
+    }
+
+    public void zip(String[] args) {
+        int firstIndex = 0;
+        boolean includeSubdirs = false;
+        // Check for -r option FIRST
+        if (args.length > 0 && "-r".equals(args[0])) {
+            includeSubdirs = true;
+            firstIndex = 1;
+        }
+        // check for minimum required arguments
+        int remainingArgs = args.length - firstIndex;
+        if (remainingArgs < 2) {
+            System.out.println("Error: Requires archive name and source files");
+            return;
+        }
+        // Get archive name and source paths
+        Path archPath = currentPath.resolve(args[firstIndex]).normalize();
+        Path[] srcPaths = new Path[remainingArgs - 1];
+        int i = 0;
+        while (i < srcPaths.length) {
+            srcPaths[i] = currentPath.resolve(args[firstIndex + 1 + i]).normalize();
+            i++;
+        }
+        // Create zip archive and add all source paths
+        try (ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(archPath.toFile()))) {
+            for (Path srcPath : srcPaths) {
+                if (Files.notExists(srcPath)) {
+                    System.out.println("Error: path does not exist: " + srcPath);
+                    continue;
+                }
+                if (Files.isDirectory(srcPath)) {
+                    if (includeSubdirs) {
+                        Files.walkFileTree(srcPath, new SimpleFileVisitor<Path>() {
+                            @Override
+                            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                                ZipEntry zipEntry = new ZipEntry(srcPath.relativize(file).toString());
+                                zos.putNextEntry(zipEntry);
+                                Files.copy(file, zos);
+                                zos.closeEntry();
+                                return FileVisitResult.CONTINUE;
+                            }
+                        });
+                    } else {
+                        try (DirectoryStream<Path> stream = Files.newDirectoryStream(srcPath)) {
+                            for (Path entry : stream) {
+                                if (Files.isRegularFile(entry)) {
+                                    ZipEntry zipEntry = new ZipEntry(srcPath.relativize(entry).toString());
+                                    zos.putNextEntry(zipEntry);
+                                    Files.copy(entry, zos);
+                                    zos.closeEntry();
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    ZipEntry zipEntry = new ZipEntry(srcPath.getFileName().toString());
+                    zos.putNextEntry(zipEntry);
+                    Files.copy(srcPath, zos);
+                    zos.closeEntry();
+                }
+            }
+        } catch (IOException e) {
+            System.out.println("Error creating zip archive: " + e.getMessage());
+        }
+    }
+
     public void rm(String[] args) throws IOException{
         // if the folder name has spaces
         String arg="";
@@ -252,16 +480,30 @@ class Terminal {
             case("rmdir"):
                 rmdir(args);
                 return ""; 
-           
+                 
             case("rm"):
                 rm(args);
                 return ""; 
 
-                
             case("mkdir"):
-               mkdir(args);
-               return "";
+                mkdir(args);
+                return "";
 
+            case("cp"):
+                cp(args);
+                return "";
+            
+            case "touch":
+            touch(args);
+            return "";
+
+            case "cat":
+            cat(args);
+            return "";
+
+            case "zip":
+            zip(args);
+            return "";   
 
             default:
                 System.out.print("Command Not Found");
