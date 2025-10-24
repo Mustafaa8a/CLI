@@ -30,7 +30,7 @@ public class Parser {
     }
 
     //  Split by spaces
-    String[] tokens = command.trim().split(" ");
+    String[] tokens = command.trim().split("\\s+");
     commandName = tokens[0];
 
     // Initial values in case there's no redirection
@@ -88,47 +88,49 @@ class Terminal {
     }
 
     public void cd(String[] args) {
-        if (args.length == 1 || args.length == 0) {
-
-            Path newPath;
-            // if No arguments: go to home directory
-            if (args.length == 0) {
-                newPath = homePath;
-            } 
-            else {
-                String arg = args[0];
-                // Go to parent directory
-                if ("..".equals(arg)) {
-                    Path parentPath = currentPath.getParent();
-                    if (parentPath == null) {
-                        return;
-                    }else{
-                        currentPath = parentPath;
-                        return;
-                    }
-                }
-
-                // Navigate to a specific directory
-                newPath = currentPath.resolve(arg);
-                newPath = newPath.normalize().toAbsolutePath();
-
-                if (Files.isDirectory(newPath)) {
-                    currentPath = newPath;
-                    return;
-                } else {
-                    System.out.println("Error: Directory does not exist");
-                    return;
-                }
-            }
-
-            // Apply home path change if no args
-            currentPath = newPath;
-
-        } 
-        else {
-         System.out.println("Error: too many arguments");
+        if (args.length > 1) {
+            System.out.println("Error: too many arguments");
             return;
         }
+
+        // if No arguments: go to home directory
+        if (args.length == 0) {
+            currentPath = homePath;
+            return;
+        } 
+        Path newPath;
+    
+        String arg = args[0];
+        // Go to parent directory
+        if ("..".equals(arg)) {
+            Path parentPath = currentPath.getParent();
+            if (parentPath == null) {
+                return;
+            }else{
+                currentPath = parentPath;
+                return;
+            }
+        }
+
+        
+        try {
+
+            // Navigate to a specific directory
+            newPath = currentPath.resolve(arg);
+            newPath = newPath.normalize().toAbsolutePath();
+            
+            if (Files.isDirectory(newPath)) {
+                currentPath = newPath;
+                return;
+            } else {
+                System.out.println("Error: Directory does not exist");
+                return;
+            }
+            
+        } catch (Exception e) {
+            System.out.println("Error: "+ e.getMessage());
+        }
+        
     }
 
     public String ls()
@@ -267,11 +269,10 @@ private void copyFile(Path source, Path destination) throws IOException {
 }
 
 
-    public void rmdir(String[] args) throws IOException {
+    public void rmdir(String[] args) {
         /*
          1- * => removes all empty directories
          2- path => remove the given directory is it's empty
-         3-  handle spaces in the name of the directory
         */
         if (args.length==0) {
             System.out.println("Error: rmdir takes one argument");
@@ -295,19 +296,15 @@ private void copyFile(Path source, Path destination) throws IOException {
                         }
                     }
                 }   
+            }catch (Exception e) {
+                System.out.println("Error: " + e.getMessage());
             }
             return;
         }
         else{
-            // if the folder name has spaces
-            String arg="";
-            for (String string : args) {
-                arg+=string+" ";
-            }
-            arg=arg.trim(); // To remove the last space
 
             // Get the path of the directory we want to delete
-            Path dir = currentPath.resolve(arg).normalize().toAbsolutePath();
+            Path dir = currentPath.resolve(args[0]).normalize().toAbsolutePath();
 
             // Check if the dir exists and is a directory not a file
             if (Files.isDirectory(dir)) {
@@ -322,6 +319,8 @@ private void copyFile(Path source, Path destination) throws IOException {
                     else {
                         System.out.print(dir.getFileName()+" is not empty!");
                     }
+                }catch (Exception e) {
+                    System.out.println("Error: " + e.getMessage());
                 }
                 return;
             } 
@@ -445,60 +444,83 @@ private void copyFile(Path source, Path destination) throws IOException {
         }
     }
 
-    public void rm(String[] args) throws IOException{
-        // if the folder name has spaces
-        String arg="";
-        for (String string : args) {
-            arg+=string+" ";
-        }
-        arg=arg.trim(); // To remove the last space
+    public void rm(String[] args){
 
         // Path of the file 
-        Path file = currentPath.resolve(arg);
+        Path file = currentPath.resolve(args[0]);
 
         // Check if the file exists and is a file
-        if (Files.isRegularFile(file)) {
-            Files.delete(file);
-        }
-        else{
-            System.out.print(file.getFileName() + " does not exist or is not a file");
+        try {
+
+            if (Files.isRegularFile(file)) {
+                Files.delete(file);
+            }
+            else{
+                System.out.print(file.getFileName() + " does not exist or is not a file");
+            }
+            
+        } catch (Exception e) {
+            System.out.println("Error: " + e.getMessage());
         }
     }
    
-    //===========================================
     //  mkdir command implementation
-    //===========================================
    public void mkdir(String[] args) {
-    // 1) Check if user passed at least one argument 
-    if (args.length == 0) {
-        System.out.println("mkdir: missing operand");
-        return;
-    }
-
-    // 2) Loop over each argument (each dir name/path separately)
-    for (String dirArg : args) {
-        
-        // Build the path for this directory
-        Path dirPath = currentPath.resolve(dirArg).normalize().toAbsolutePath();
-        
-        // Check if directory exists
-        if (Files.exists(dirPath)) {
-            System.out.println("mkdir: cannot create directory '" + dirArg + "': File exists");
-            continue; // move to next one
+        // Check if user passed at least one argument 
+        if (args.length == 0) {
+            System.out.println("mkdir: missing operand");
+            return;
         }
 
-        // Try to create directory (including parent folders)
+        // Loop over each argument (each dir name/path separately)
+        for (String dirArg : args) {
+            
+            // Build the path for this directory
+            Path dirPath = currentPath.resolve(dirArg).normalize().toAbsolutePath();
+            
+            // Check if directory exists
+            if (Files.exists(dirPath)) {
+                System.out.println("mkdir: cannot create directory '" + dirArg + "': File exists");
+                continue;
+            }
+
+            // Try to create directory (including parent folders)
+            try {
+                // createDirectories -> supports nested like xxx/xxxx
+                Files.createDirectories(dirPath);
+            } catch (IOException e) {
+                System.out.println("mkdir: failed to create '" + dirArg + "': " + e.getMessage());
+            }
+        }
+    }
+
+    public void wc(String[] args){
+        if (args.length != 1) {
+            System.out.println("Error: wc takes 1 argument");
+        }
+        Path file = currentPath.resolve(args[0]);
         try {
-            // createDirectories → supports nested like xxx/xxxx
-            Files.createDirectories(dirPath);
-        } catch (IOException e) {
-            System.out.println("mkdir: failed to create '" + dirArg + "': " + e.getMessage());
+            // Path fileName = file.getFileName(); // Get file Name 
+            String fileContent = new String(Files.readAllBytes(file)); // read file content
+            
+            long numLines = fileContent.lines().count();
+            
+            // Split between words by spaces (one space or more)
+            long numWords = Arrays.stream(fileContent.split("\\s+")).filter(w -> !w.isEmpty()).count();
+            
+            // Count number of chars
+            long charCount = fileContent.length();
+
+            System.out.println(numLines + " " + numWords + " " + charCount + " " + file.getFileName());
+            
+        } catch (Exception e) {
+             System.out.println("Error: Can not resolve file" + e.getMessage());
         }
+        
     }
-}
 
-
-    private String runCommand(String cmd,String[] args) throws IOException{
+    private String runCommand(String cmd,String[] args){
+        
         switch (cmd) {
             case "pwd":
                 return pwd();
@@ -527,16 +549,20 @@ private void copyFile(Path source, Path destination) throws IOException {
                 return "";
             
             case "touch":
-            touch(args);
-            return "";
+                touch(args);
+                return "";
 
             case "cat":
-            cat(args);
-            return "";
+                cat(args);
+                return "";
+            
+            case "wc":
+                wc(args);
+                return "";
 
             case "zip":
-            zip(args);
-            return "";   
+                zip(args);
+                return "";   
 
             default:
                 System.out.print("Command Not Found");
@@ -570,7 +596,7 @@ public static void main(String[] args) throws IOException {
         //  Execute the command and capture output
         String output = terminal.runCommand(cmd, arg);
 
-        //  Check if output redirection is used (((((((((((> or >>)))))))))))
+        //  Check if output redirection is used ( ">" or ">>" )
           if (terminal.parser.redirectFile != null) {
              Path filePath = terminal.currentPath.resolve(terminal.parser.redirectFile);
 
