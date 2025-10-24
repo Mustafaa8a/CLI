@@ -11,28 +11,61 @@ import java.io.FileOutputStream;
 public class Parser {
     String commandName;
     String args[];
-    
-    public boolean parse(String command){
-        // Check if the commnd is empty(null) or consists of white spaces only
-        if (command == null) {
-            return false;
-        }
-        else if (command.trim().isEmpty()) {
-            return false;
-        }
-        // Make an array to store the whole command 
-        String[] commands = command.split(" ");
-        commandName=commands[0];
-        
-        // We didn't specify size of the array so we will specify it now with number of commands-1 
-        args = new String[commands.length-1];
-        
-        for (int i = 1; i < commands.length; i++) {
-            args[i-1]=commands[i];
-        }
 
-        return true;
+    // Holds the file name that the output should be redirected to (if any).
+   public String redirectFile = null;
+
+   // Determines whether the output should be appended to an existing file (>>) 
+   // or overwrite the file content (>).
+   public boolean appendMode = false;
+
+    
+ public boolean parse(String command) {
+    //  Check if the command is null or empty
+    if (command == null ) {
+        return false;
     }
+    else if(command.trim().isEmpty()){
+        return false;
+    }
+
+    //  Split by spaces
+    String[] tokens = command.trim().split(" ");
+    commandName = tokens[0];
+
+    // Initial values in case there's no redirection
+    redirectFile = null;
+    appendMode = false;
+
+    //  Count args without redirection
+    int argCount = 0;
+    for (int i = 1; i < tokens.length; i++) {
+        if (tokens[i].equals(">") || tokens[i].equals(">>")) break;
+        argCount++;
+    }
+
+    //  Create args array
+    args = new String[argCount];
+    for (int i = 1; i <= argCount; i++) {
+        args[i - 1] = tokens[i];
+    }
+
+    //  Check for redirection (if exists)
+    for (int i = 1; i < tokens.length; i++) {
+        if (tokens[i].equals(">") || tokens[i].equals(">>")) {
+            appendMode = tokens[i].equals(">>");
+            if (i + 1 < tokens.length) {
+                redirectFile = tokens[i + 1];
+            } else {
+                System.out.println("Error: Missing file name after redirection.");
+                return false;
+            }
+            break;
+        }
+    }
+
+    return true;
+}
 
     
     public String getCommandName(){
@@ -514,31 +547,53 @@ private void copyFile(Path source, Path destination) throws IOException {
     }
 
 
-    public static void main(String[] args) throws IOException {
-        Terminal terminal = new Terminal();
-        Scanner scanner = new Scanner(System.in);
+public static void main(String[] args) throws IOException {
+    Terminal terminal = new Terminal();
+    Scanner scanner = new Scanner(System.in);
+
+    while (true) {
+        System.out.print(terminal.currentPath + "> ");
         
-        while (true) {
-            System.out.print(terminal.currentPath + "> ");
-            // Read input
-            String command = scanner.nextLine();
+        //  Read user input
+        String command = scanner.nextLine();
 
-            // Parse commnd into command and arguments
-            terminal.parser.parse(command);
-            String cmd = terminal.parser.getCommandName();
-            String[] arg = terminal.parser.getArgs();
+        //  Parse the input command
+        terminal.parser.parse(command);
+        String cmd = terminal.parser.getCommandName();
+        String[] arg = terminal.parser.getArgs();
 
-            // Check if the command equals to exit to break the loop 
-            if (cmd.equals("exit")) {
-                break;
-            }
-            // run command
-            System.out.println(terminal.runCommand(cmd,arg));
-            
+        //  Exit condition
+        if (cmd.equals("exit")) {
+            break;
         }
-        
-        
-        scanner.close();
-    }
-} 
 
+        //  Execute the command and capture output
+        String output = terminal.runCommand(cmd, arg);
+
+        //  Check if output redirection is used (((((((((((> or >>)))))))))))
+          if (terminal.parser.redirectFile != null) {
+             Path filePath = terminal.currentPath.resolve(terminal.parser.redirectFile);
+
+            try {
+               if (terminal.parser.appendMode) {
+                // >> Append mode
+                   Files.writeString(filePath, output + System.lineSeparator(), 
+                   StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+               } else {
+                // > Overwrite mode
+                   Files.writeString(filePath, output + System.lineSeparator(),
+                   StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+                }
+            } catch (IOException e) {
+                   System.out.println("Error writing to file: " + e.getMessage());
+            }
+        } else {
+             System.out.println(output);
+           }
+
+    }
+
+    scanner.close();
+  }
+
+}
