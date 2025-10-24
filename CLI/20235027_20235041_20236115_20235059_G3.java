@@ -8,7 +8,7 @@ import java.util.zip.*;
 import java.io.FileOutputStream;
 
 
-public class Parser {
+ class Parser {
     String commandName;
     String args[];
 
@@ -76,7 +76,6 @@ public class Parser {
         return args;
     }
 }
-
 
 class Terminal {
     Parser parser = new Parser();
